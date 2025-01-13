@@ -1,39 +1,24 @@
-from datetime import datetime
-
 receipts_df = xl("B2:D14", headers=True)
 payments_df = xl("F2:H7", headers=True)
 
 receipts_df['Date'] = pd.to_datetime(receipts_df['Date'], format='%d/%m/%Y')
 payments_df['Date'] = pd.to_datetime(payments_df['Date'], format='%d/%m/%Y')
 
+remaining_payments = payments_df[['ID', 'Payment']].assign(Remaining=lambda df: df['Payment'])
 results = []
 
-remaining_payments = payments_df[['ID', 'Payment']].copy()
-remaining_payments['Remaining'] = remaining_payments['Payment']
-
-for index, receipt in receipts_df.iterrows():
-    receipt_cost = receipt['Cost']
-    receipt_date = receipt['Date']
-    payment_durations = []
-    payment_contributions = []
+for _, receipt in receipts_df.iterrows():
+    receipt_cost, receipt_date = receipt['Cost'], receipt['Date']
+    payment_durations, payment_contributions = [], []
     for idx, payment in remaining_payments.iterrows():
-        payment_date = payments_df.loc[idx, 'Date']
-        if remaining_payments.loc[idx, 'Remaining'] > 0:
-            if remaining_payments.loc[idx, 'Remaining'] >= receipt_cost:
-                payment_amount = receipt_cost
-            else:
-                payment_amount = remaining_payments.loc[idx, 'Remaining']
-            duration = (payment_date - receipt_date).days
-            payment_durations.append(duration)
+        if payment.Remaining > 0:
+            payment_amount = min(payment.Remaining, receipt_cost)
+            payment_durations.append((payments_df.at[idx, 'Date'] - receipt_date).days)
             payment_contributions.append(payment_amount)
-            remaining_payments.loc[idx, 'Remaining'] -= payment_amount
+            remaining_payments.at[idx, 'Remaining'] -= payment_amount
             receipt_cost -= payment_amount
-            if receipt_cost == 0:
-                break
-    if sum(payment_contributions) > 0:
-        avg_duration = sum(d * a for d, a in zip(payment_durations, payment_contributions)) / sum(payment_contributions)
-    else:
-        avg_duration = 'NP'
+            if receipt_cost == 0: break
+    avg_duration = sum(d * a for d, a in zip(payment_durations, payment_contributions)) / sum(payment_contributions) if payment_contributions else 'NP'
     results.append({'Receipt ID': receipt['ID'], 'Duration': avg_duration})
 
 results_df = pd.DataFrame(results)
