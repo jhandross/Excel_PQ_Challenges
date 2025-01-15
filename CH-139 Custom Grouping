@@ -1,19 +1,12 @@
 df = xl("B2:C26", headers=True)
-
 df['dayI'], df['dayD'] = (df['Stock price'].shift() > df['Stock price']).cumsum(), (df['Stock price'].shift() < df['Stock price']).cumsum()
 df['grdI'], df['grdD'] = [df.groupby(g)[g].transform(lambda x: x if len(x) > 2 else pd.NA) for g in ['dayI', 'dayD']]
-
-df['chkgrIgrD'] = df.apply(lambda r: r['grdI'] if pd.notna(r['grdI']) and pd.isna(r['grdD']) else (r['grdD'] if pd.notna(r['grdD']) and pd.isna(r['grdI']) else (min(r['grdI'], r['grdD']) if pd.notna(r['grdI']) and pd.notna(r['grdD']) else pd.NA)), axis=1)
-
+df['chkgrIgrD'] = df.apply(lambda r: r['grdI'] if pd.notna(r['grdI']) and pd.isna(r['grdD']) else r['grdD'] if pd.notna(r['grdD']) and pd.isna(r['grdI']) else min(r['grdI'], r['grdD']) if pd.notna(r['grdI']) and pd.notna(r['grdD']) else pd.NA, axis=1)
 df['diffStkPrc'] = df['Stock price'].diff().fillna(0)
 df['mxDiffChk'] = df.groupby('chkgrIgrD')['diffStkPrc'].transform(lambda x: 1 if x.gt(0).sum() > x.lt(0).sum() else -1)
 df['Group'] = df['mxDiffChk'].map({1: 'Upward', -1: 'Downward'})
-
 df['percentChngePr'] = df['Stock price'].pct_change().fillna(0)
-df['fistVal'] = df.groupby('chkgrIgrD')['Stock price'].transform('first')
-df['cumSumDiffChk'] = df.groupby('chkgrIgrD')['diffStkPrc'].transform(lambda x: x.shift(-1).cumsum())
+df['fistVal'], df['cumSumDiffChk'] = df.groupby('chkgrIgrD')['Stock price'].transform('first'), df.groupby('chkgrIgrD')['diffStkPrc'].transform(lambda x: x.shift(-1).cumsum())
 df['rtCumSumPerctChng'] = (df['cumSumDiffChk'] / df['fistVal']).fillna(0)
-
 resume = df.groupby('Group').agg({'percentChngePr': ['min', 'max'], 'rtCumSumPerctChng': ['min', 'max']})
 result = pd.DataFrame({'Group': ['Increase', 'Decrease'], 'Percent': [resume.values.max(), resume.values.min()]})
-result
