@@ -1,20 +1,26 @@
 from datetime import datetime, timedelta, time
-df1 = xl("Table1[#All]", 1)
-df2 = xl("Table2[#All]", 1)
+df1 = xl("Table1[#Todo]", 1)
+df2 = xl("Table2[#Todo]", 1)
+
 df1['Duration'] = df1['Duration'].apply(lambda d: f"{datetime.strptime(d,'%I:%M %p').hour:02d}:{datetime.strptime(d,'%I:%M %p').minute:02d}" if isinstance(d,str) else f"{d.hour:02d}:{d.minute:02d}" if isinstance(d,time) else d)
 df1['Departure_dt'] = pd.to_datetime(df1['Departure Time'], format="%H:%M:%S")
 df1['Duration_td'] = df1['Duration'].apply(lambda d: timedelta(hours=int(d.split(":")[0]), minutes=int(d.split(":")[1])))
+
 tz_map = {r['City']: int(r['Time Zone'].replace("GMT+", "").replace("GMT-", "-")) for _,r in df2.iterrows()}
 df1['Departure_UTC'] = df1.apply(lambda r: r['Departure_dt'] - timedelta(hours=tz_map[r['From']]), axis=1)
 df1['Arrival_UTC'] = df1['Departure_UTC'] + df1['Duration_td']
+
 flights = {c: list(g[['ID','To','Departure_UTC','Arrival_UTC','Duration_td']].to_dict('records')) for c,g in df1.groupby('From')}
+
 def find_routes(cur,end,time,path,dep_first,routes):
     if cur==end: routes.append({"IDs":[f["ID"] for f in path], "Total Duration":path[-1]['Arrival_UTC']-dep_first, "Arrival UTC":path[-1]['Arrival_UTC']}); return
     for f in flights.get(cur,[]):
         if f['Departure_UTC']>=time and f['ID'] not in [p['ID'] for p in path]:
             find_routes(f['To'],end,f['Arrival_UTC'],path+[f],dep_first or f['Departure_UTC'],routes)
+
 all_routes=[]
 find_routes("A","B",datetime.min,[],None,all_routes)
+
 df_result = pd.DataFrame([{
     "ID": ",".join(map(str,r['IDs'])), 
     "Duration": f"{r['Total Duration'].seconds//3600:02d}:{(r['Total Duration'].seconds%3600)//60:02d}:{r['Total Duration'].seconds%60:02d}", 
