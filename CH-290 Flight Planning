@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, time
-df1 = xl("Table1[#Todo]", 1)
-df2 = xl("Table2[#Todo]", 1)
+df1 = xl("Table1[#All]", 1)
+df2 = xl("Table2[#All]", 1)
 
 df1['Duration'] = df1['Duration'].apply(lambda d: f"{datetime.strptime(d,'%I:%M %p').hour:02d}:{datetime.strptime(d,'%I:%M %p').minute:02d}" if isinstance(d,str) else f"{d.hour:02d}:{d.minute:02d}" if isinstance(d,time) else d)
 df1['Departure_dt'] = pd.to_datetime(df1['Departure Time'], format="%H:%M:%S")
